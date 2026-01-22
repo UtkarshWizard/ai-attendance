@@ -82,7 +82,7 @@ const StudentRegistration = () => {
 
       setMessage({
         type: 'success',
-        text: 'Student enrolled successfully! 🚀'
+        text: 'Student enrolled successfully! '
       })
 
       setFormData({ name: '', roll_number: '', class_id: '' })
@@ -107,15 +107,11 @@ const StudentRegistration = () => {
         animate={{ opacity: 1, y: 0 }}
         className="text-center space-y-3"
       >
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold tracking-wider uppercase">
-          <Fingerprint className="h-3 w-3" />
-          Biometric Enrollment
-        </div>
         <h1 className="text-5xl font-black tracking-tighter gradient-text">
           Enroll Student<span className="text-foreground/20">.</span>
         </h1>
         <p className="text-muted-foreground font-medium max-w-lg mx-auto">
-          Add new students to the AI database. Clear photos ensure 99.9% recognition accuracy.
+          Add new students to the database.
         </p>
       </motion.div>
 

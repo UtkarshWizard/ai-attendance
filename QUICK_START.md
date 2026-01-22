@@ -1,6 +1,6 @@
 # Quick Start Guide - Neon DB Setup
 
-## 🚀 Fastest Way to Get Started (No PostgreSQL Installation!)
+##  Fastest Way to Get Started (No PostgreSQL Installation!)
 
 ### Step 1: Create Neon DB Account (2 minutes)
 

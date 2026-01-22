@@ -102,7 +102,7 @@ npm run setup-db
 
 # Start server
 npm start
-# Should see: "🚀 Backend server running on port 3000"
+# Should see: " Backend server running on port 3000"
 ```
 
 ### 4. Frontend Setup (3 minutes)

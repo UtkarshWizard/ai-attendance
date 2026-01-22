@@ -69,10 +69,6 @@ const TeacherAttendance = () => {
         className="flex flex-col md:flex-row md:items-center justify-between gap-6"
       >
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold tracking-wider uppercase">
-            <Scan className="h-3 w-3" />
-            AI Scanner Active
-          </div>
           <h1 className="text-5xl font-black tracking-tighter gradient-text">
             Mark Session<span className="text-foreground/20">.</span>
           </h1>
@@ -164,7 +160,7 @@ const TeacherAttendance = () => {
                             <Camera className="w-8 h-8 text-primary" />
                           </div>
                           <p className="text-sm font-bold">Standard Group Photo</p>
-                          <p className="text-xs text-muted-foreground mt-2 max-w-[200px]">Ensure all faces are visible for the AI agent.</p>
+                          <p className="text-xs text-muted-foreground mt-2 max-w-[200px]">Ensure all faces are visible.</p>
                         </div>
                       )}
                     </label>
@@ -197,7 +193,7 @@ const TeacherAttendance = () => {
                   ) : (
                     <div className="flex items-center gap-3">
                       <Sparkles className="h-6 w-6 group-hover:scale-125 transition-transform" />
-                      <span>Execute AI Process</span>
+                      <span>Mark Attendance</span>
                     </div>
                   )}
                 </Button>
@@ -223,7 +219,7 @@ const TeacherAttendance = () => {
               >
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
-                    { label: 'Identified', value: result.summary.present, icon: UserCheck, color: 'text-green-500', bg: 'bg-green-500/10' },
+                    { label: 'Present', value: result.summary.present, icon: UserCheck, color: 'text-green-500', bg: 'bg-green-500/10' },
                     { label: 'Absent', value: result.summary.absent, icon: UserX, color: 'text-red-500', bg: 'bg-red-500/10' },
                     { label: 'Total', value: result.summary.total_students, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
                     { label: 'Detected', value: result.summary.faces_detected, icon: Eye, color: 'text-purple-500', bg: 'bg-purple-500/10' },
@@ -247,7 +243,6 @@ const TeacherAttendance = () => {
                 <div className="glass-card rounded-[2.5rem] p-8 border-none flex items-center justify-between bg-primary/10">
                   <div className="space-y-1">
                     <h3 className="font-black text-xl gradient-text">Sync Complete!</h3>
-                    <p className="text-sm text-muted-foreground font-medium">All identified records have been pushed to the blockchain ledger.</p>
                   </div>
                   <div className="h-14 w-14 rounded-full bg-primary/20 flex items-center justify-center">
                     <CheckCircle2 className="h-8 w-8 text-primary" />
@@ -269,8 +264,8 @@ const TeacherAttendance = () => {
                     className="absolute left-0 right-0 h-0.5 bg-primary/20 blur-sm"
                   />
                 </div>
-                <h3 className="text-2xl font-black tracking-tight">Vibe Check Pending</h3>
-                <p className="text-muted-foreground max-w-xs mx-auto mt-2 font-medium">Results will manifest here once the AI finishes analyzing your class atmosphere.</p>
+                <h3 className="text-2xl font-black tracking-tight">Match Pending</h3>
+                <p className="text-muted-foreground max-w-xs mx-auto mt-2 font-medium">Results will manifest here.</p>
               </motion.div>
             )}
           </AnimatePresence>

@@ -107,7 +107,7 @@ const AttendanceDashboard = () => {
           { label: 'Total Students', value: totalCount, icon: Users, color: 'primary' },
           { label: 'Present Today', value: presentCount, icon: CheckCircle2, color: 'green' },
           { label: 'Absent Today', value: absentCount, icon: XCircle, color: 'red' },
-          { label: 'Engagement Rate', value: `${attendanceRate}%`, icon: TrendingUp, color: 'blue' },
+          { label: 'Attendance Rate', value: `${attendanceRate}%`, icon: TrendingUp, color: 'blue' },
         ].map((stat, i) => (
           <motion.div
             key={stat.label}
@@ -146,15 +146,6 @@ const AttendanceDashboard = () => {
               <h2 className="text-xl font-bold tracking-tight">Student Directory</h2>
               <p className="text-xs text-muted-foreground font-medium">Real-time status of all enrolled students</p>
             </div>
-          </div>
-          
-          <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-            <input 
-              type="text" 
-              placeholder="Search by name or roll..."
-              className="bg-white/5 border border-white/5 rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:ring-2 ring-primary/20 w-full md:w-64 transition-all"
-            />
           </div>
         </div>
 

@@ -24,7 +24,7 @@ The system consists of three main components:
 - PostgreSQL 12+
 - npm or yarn
 
-## 🚀 Setup Instructions
+##  Setup Instructions
 
 ### 1. Database Setup
 
