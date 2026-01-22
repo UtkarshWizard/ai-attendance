@@ -744,11 +744,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 👥 Contributors
-
-- **Utkarsh** - Initial work & AI improvements
-
----
 
 ## 🙏 Acknowledgments
 
@@ -764,7 +759,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 For issues, questions, or contributions:
 - Open an issue on GitHub
-- Contact: your-email@example.com
+- Contact: utkarshr1214@example.com
 
 ---
 
