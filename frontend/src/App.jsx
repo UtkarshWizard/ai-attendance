@@ -14,8 +14,15 @@ const AppRoutes = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="h-8 w-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-6">
+        <div className="relative">
+          <div className="h-16 w-16 border-4 border-primary/10 border-t-primary rounded-full animate-spin"></div>
+          <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full animate-pulse"></div>
+        </div>
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-xl font-black tracking-tighter gradient-text">ABSENCE.AI</span>
+          <span className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em]">Synchronizing</span>
+        </div>
       </div>
     )
   }

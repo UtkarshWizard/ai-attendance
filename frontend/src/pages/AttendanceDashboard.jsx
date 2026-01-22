@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
-import { motion } from 'framer-motion'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Card, CardContent } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
-import { Calendar, Users, CheckCircle2, XCircle, TrendingUp } from 'lucide-react'
+import { Calendar, Users, CheckCircle2, XCircle, TrendingUp, Search, Filter, Hash } from 'lucide-react'
 
 const AttendanceDashboard = () => {
   const [classId, setClassId] = useState('')
@@ -47,225 +47,181 @@ const AttendanceDashboard = () => {
   const attendanceRate = totalCount > 0 ? ((presentCount / totalCount) * 100).toFixed(1) : 0
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent mb-2">
-          Attendance Dashboard
-        </h1>
-        <p className="text-muted-foreground">
-          View and analyze attendance records for your classes
-        </p>
+    <div className="max-w-6xl mx-auto space-y-10 pb-20">
+      {/* Header Section */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col md:flex-row md:items-end justify-between gap-6"
+      >
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold tracking-wider uppercase">
+            <TrendingUp className="h-3 w-3" />
+            Live Insights
+          </div>
+          <h1 className="text-5xl font-black tracking-tighter gradient-text">
+            Analytics<span className="text-foreground/20">.</span>
+          </h1>
+          <p className="text-muted-foreground font-medium max-w-md">
+            Monitor real-time participation and attendance trends across your classes.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="glass px-4 py-2 rounded-2xl flex items-center gap-3 border-white/5 shadow-sm">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase text-muted-foreground/70 tracking-widest">Class ID</span>
+              <div className="flex items-center gap-2">
+                <Hash className="h-3.5 w-3.5 text-primary" />
+                <input 
+                  type="number" 
+                  value={classId}
+                  onChange={(e) => setClassId(e.target.value)}
+                  placeholder="001"
+                  className="bg-transparent border-none outline-none w-16 font-bold text-sm focus:ring-0 p-0"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="glass px-4 py-2 rounded-2xl flex items-center gap-3 border-white/5 shadow-sm">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase text-muted-foreground/70 tracking-widest">Date</span>
+              <div className="flex items-center gap-2">
+                <Calendar className="h-3.5 w-3.5 text-primary" />
+                <input 
+                  type="date" 
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="bg-transparent border-none outline-none font-bold text-sm focus:ring-0 p-0 [color-scheme:dark]"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[
+          { label: 'Total Students', value: totalCount, icon: Users, color: 'primary' },
+          { label: 'Present Today', value: presentCount, icon: CheckCircle2, color: 'green' },
+          { label: 'Absent Today', value: absentCount, icon: XCircle, color: 'red' },
+          { label: 'Engagement Rate', value: `${attendanceRate}%`, icon: TrendingUp, color: 'blue' },
+        ].map((stat, i) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: i * 0.1 }}
+          >
+            <Card className="glass-card border-none hover:scale-[1.02] transition-all duration-300 group cursor-default">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-black uppercase text-muted-foreground tracking-widest">{stat.label}</p>
+                    <p className="text-3xl font-black tracking-tighter">{stat.value}</p>
+                  </div>
+                  <div className={`p-3 rounded-2xl bg-${stat.color === 'primary' ? 'primary' : stat.label.toLowerCase().includes('present') ? 'green-500' : stat.label.toLowerCase().includes('absent') ? 'red-500' : 'blue-500'}/10 group-hover:scale-110 transition-transform duration-500`}>
+                    <stat.icon className={`h-6 w-6 text-${stat.color === 'primary' ? 'primary' : stat.label.toLowerCase().includes('present') ? 'green-500' : stat.label.toLowerCase().includes('absent') ? 'red-500' : 'blue-500'} transition-colors`} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
       </div>
 
-      <Card className="border-2">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
-            Filter Attendance
-          </CardTitle>
-          <CardDescription>
-            Select a class and date to view attendance records
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="class_id">Class ID</Label>
-              <Input
-                type="number"
-                id="class_id"
-                value={classId}
-                onChange={(e) => setClassId(e.target.value)}
-                placeholder="Enter class ID"
-                className="h-11"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
-              <Input
-                type="date"
-                id="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="h-11"
-              />
+      {/* Table Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="glass-card rounded-[2.5rem] overflow-hidden border-white/5"
+      >
+        <div className="p-8 border-b border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-1 rounded-full bg-primary shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">Student Directory</h2>
+              <p className="text-xs text-muted-foreground font-medium">Real-time status of all enrolled students</p>
             </div>
           </div>
-
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-4 bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-md text-sm"
-            >
-              {error}
-            </motion.div>
-          )}
-        </CardContent>
-      </Card>
-
-      {loading ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="h-8 w-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+          
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+            <input 
+              type="text" 
+              placeholder="Search by name or roll..."
+              className="bg-white/5 border border-white/5 rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:ring-2 ring-primary/20 w-full md:w-64 transition-all"
+            />
+          </div>
         </div>
-      ) : attendance.length > 0 ? (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.1 }}
-            >
-              <Card className="border-2 border-primary/20 bg-primary/5">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">
-                        Total Students
-                      </p>
-                      <p className="text-3xl font-bold text-primary">
-                        {totalCount}
-                      </p>
-                    </div>
-                    <Users className="h-8 w-8 text-primary/40" />
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
 
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2 }}
-            >
-              <Card className="border-2 border-green-500/20 bg-green-500/5">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">
-                        Present
-                      </p>
-                      <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-                        {presentCount}
-                      </p>
-                    </div>
-                    <CheckCircle2 className="h-8 w-8 text-green-500/40" />
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Card className="border-2 border-red-500/20 bg-red-500/5">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">
-                        Absent
-                      </p>
-                      <p className="text-3xl font-bold text-red-600 dark:text-red-400">
-                        {absentCount}
-                      </p>
-                    </div>
-                    <XCircle className="h-8 w-8 text-red-500/40" />
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.4 }}
-            >
-              <Card className="border-2 border-blue-500/20 bg-blue-500/5">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">
-                        Attendance Rate
-                      </p>
-                      <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                        {attendanceRate}%
-                      </p>
-                    </div>
-                    <TrendingUp className="h-8 w-8 text-blue-500/40" />
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
-
-          <Card className="border-2">
-            <CardHeader>
-              <CardTitle>Attendance Records</CardTitle>
-              <CardDescription>
-                Detailed list of all students and their attendance status
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-3 px-4 font-semibold text-sm">Roll Number</th>
-                      <th className="text-left py-3 px-4 font-semibold text-sm">Name</th>
-                      <th className="text-left py-3 px-4 font-semibold text-sm">Status</th>
-                      <th className="text-left py-3 px-4 font-semibold text-sm">Confidence</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {attendance.map((record, index) => (
-                      <motion.tr
-                        key={record.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="border-b hover:bg-accent/50 transition-colors"
-                      >
-                        <td className="py-3 px-4 font-medium">{record.roll_number}</td>
-                        <td className="py-3 px-4 text-muted-foreground">{record.name}</td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                              record.status === 'present'
-                                ? 'bg-green-500/10 text-green-600 dark:text-green-400'
-                                : 'bg-red-500/10 text-red-600 dark:text-red-400'
-                            }`}
-                          >
-                            {record.status === 'present' ? (
-                              <CheckCircle2 className="h-3 w-3" />
-                            ) : (
-                              <XCircle className="h-3 w-3" />
-                            )}
-                            {record.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-muted-foreground">
-                          {record.confidence_score
-                            ? `${(record.confidence_score * 100).toFixed(1)}%`
-                            : 'N/A'}
-                        </td>
-                      </motion.tr>
-                    ))}
-                  </tbody>
-                </table>
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="py-20 flex flex-col items-center justify-center gap-4">
+              <div className="h-10 w-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+              <p className="text-sm font-bold text-muted-foreground animate-pulse">Syncing Database...</p>
+            </div>
+          ) : attendance.length > 0 ? (
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-white/[0.02]">
+                  <th className="py-5 px-8 text-xs font-black uppercase text-muted-foreground tracking-widest whitespace-nowrap">ID / Roll</th>
+                  <th className="py-5 px-8 text-xs font-black uppercase text-muted-foreground tracking-widest whitespace-nowrap">Student Identity</th>
+                  <th className="py-5 px-8 text-xs font-black uppercase text-muted-foreground tracking-widest whitespace-nowrap">Current Status</th>
+                  <th className="py-5 px-8 text-xs font-black uppercase text-muted-foreground tracking-widest whitespace-nowrap text-right">Confidence</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {attendance.map((record, index) => (
+                  <motion.tr
+                    key={record.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.5 + index * 0.03 }}
+                    className="hover:bg-white/[0.02] transition-colors group"
+                  >
+                    <td className="py-5 px-8">
+                      <span className="font-mono text-xs font-bold bg-white/5 px-2 py-1 rounded-lg">#{record.roll_number}</span>
+                    </td>
+                    <td className="py-5 px-8">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center font-bold text-primary group-hover:scale-110 transition-transform">
+                          {record.name[0]}
+                        </div>
+                        <span className="font-bold tracking-tight">{record.name}</span>
+                      </div>
+                    </td>
+                    <td className="py-5 px-8">
+                      <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                        record.status === 'present' 
+                        ? 'bg-green-500/10 text-green-500' 
+                        : 'bg-red-500/10 text-red-500'
+                      }`}>
+                        <div className={`h-1.5 w-1.5 rounded-full ${record.status === 'present' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                        {record.status}
+                      </div>
+                    </td>
+                    <td className="py-5 px-8 text-right font-mono text-sm font-bold text-muted-foreground">
+                      {record.confidence_score ? `${(record.confidence_score * 100).toFixed(0)}%` : '—'}
+                    </td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="py-20 text-center">
+              <div className="inline-flex items-center justify-center h-16 w-16 rounded-3xl bg-white/5 mb-4 group hover:scale-110 transition-transform cursor-default">
+                <Filter className="h-8 w-8 text-muted-foreground/30 group-hover:text-primary transition-colors" />
               </div>
-            </CardContent>
-          </Card>
-        </>
-      ) : classId && date ? (
-        <Card className="border-2">
-          <CardContent className="pt-6 text-center py-12">
-            <p className="text-muted-foreground">No attendance records found for this date.</p>
-          </CardContent>
-        </Card>
-      ) : null}
+              <h3 className="font-bold text-lg">No Results Found</h3>
+              <p className="text-muted-foreground text-sm max-w-xs mx-auto mt-1">Adjust your filters or try a different class ID to see what shows up.</p>
+            </div>
+          )}
+        </div>
+      </motion.div>
     </div>
   )
 }
