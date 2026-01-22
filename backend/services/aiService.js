@@ -45,7 +45,7 @@ class AIService {
     try {
       const FormData = require('form-data');
       const form = new FormData();
-      form.append('file', imageBuffer, {
+      form.append('file', Buffer.from(imageBuffer), {
         filename: 'group-photo.jpg',
         contentType: 'image/jpeg'
       });
@@ -54,7 +54,10 @@ class AIService {
         `${AI_SERVICE_URL}/extract-face-embeddings`,
         form,
         {
-          headers: form.getHeaders(),
+          headers: {
+            ...form.getHeaders(),
+            'Content-Length' : form.getLengthSync()
+          },
           timeout: 120000, // 2 minutes timeout for face extraction
           validateStatus: function (status) {
             return status < 500; // Don't throw for 4xx errors, let us handle them

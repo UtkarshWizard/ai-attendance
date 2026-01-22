@@ -10,12 +10,26 @@ from pydantic import BaseModel, ValidationError
 from typing import List, Optional
 import numpy as np
 from deepface import DeepFace
+from ultralytics import YOLO
+from insightface.app import FaceAnalysis
 import cv2
 from PIL import Image
 import io
 import os
 
 app = FastAPI(title="AI Attendance Service", version="1.0.0")
+
+# ---------------- YOLOv8 Face Detector ----------------
+yolo_face = YOLO(
+    os.path.join(os.path.dirname(__file__), "yolov9t-face-lindevs.pt")
+)  # lightweight & fast
+
+arcface_app = FaceAnalysis(
+    name="buffalo_l",          # stable, bundled model
+    providers=["CPUExecutionProvider"]
+)
+arcface_app.prepare(ctx_id=0, det_size=(640, 640))
+
 
 # CORS middleware to allow frontend and backend to communicate
 app.add_middleware(
@@ -47,7 +61,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 # Configuration
 SIMILARITY_THRESHOLD = 0.70  # Minimum cosine similarity for face match
-MIN_FACE_SIZE = 50  # Minimum face size in pixels to consider
+MIN_FACE_SIZE = 20  # Minimum face size in pixels to consider
 
 
 class FaceRegistrationRequest(BaseModel):
@@ -118,86 +132,213 @@ def decode_base64_image(image_str: str) -> np.ndarray:
         raise ValueError(f"Failed to decode image: {str(e)}")
 
 
-def extract_embedding(image: np.ndarray) -> np.ndarray:
-    """
-    Extract face embedding using ArcFace model via DeepFace
+# def extract_embedding(image: np.ndarray) -> np.ndarray:
+#     """
+#     Extract face embedding using ArcFace model via DeepFace
     
-    Args:
-        image: numpy array representing the image
+#     Args:
+#         image: numpy array representing the image
         
-    Returns:
-        numpy array of face embedding (512 dimensions for ArcFace)
-    """
-    try:
-        # Validate image
-        if image is None or image.size == 0:
-            raise ValueError("Image is empty or invalid")
+#     Returns:
+#         numpy array of face embedding (512 dimensions for ArcFace)
+#     """
+#     try:
+#         # Validate image
+#         if image is None or image.size == 0:
+#             raise ValueError("Image is empty or invalid")
         
-        # DeepFace uses ArcFace by default when model_name is not specified
-        # We explicitly use ArcFace for better accuracy
-        embedding = DeepFace.represent(
-            img_path=image,
-            model_name='ArcFace',
-            enforce_detection=True,
-            detector_backend='opencv'
-        )
+#         # DeepFace uses ArcFace by default when model_name is not specified
+#         # We explicitly use ArcFace for better accuracy
+#         embedding = DeepFace.represent(
+#             img_path=image,
+#             model_name='ArcFace',
+#             enforce_detection=False,
+#             detector_backend='retinaface',
+#             align=True
+#         )
         
-        # DeepFace returns a list of dictionaries, get the first face
-        if isinstance(embedding, list) and len(embedding) > 0:
-            embedding_vector = np.array(embedding[0]['embedding'])
-        elif isinstance(embedding, dict) and 'embedding' in embedding:
-            embedding_vector = np.array(embedding['embedding'])
-        else:
-            raise ValueError("Unexpected embedding format from DeepFace")
+#         # DeepFace returns a list of dictionaries, get the first face
+#         if isinstance(embedding, list) and len(embedding) > 0:
+#             embedding_vector = np.array(embedding[0]['embedding'])
+#         elif isinstance(embedding, dict) and 'embedding' in embedding:
+#             embedding_vector = np.array(embedding['embedding'])
+#         else:
+#             raise ValueError("Unexpected embedding format from DeepFace")
             
-        return embedding_vector
-    except ValueError:
-        raise
-    except Exception as e:
-        error_msg = str(e)
-        # Provide more helpful error messages
-        if "Face could not be detected" in error_msg or "enforce_detection" in error_msg:
-            raise ValueError("No face detected in image. Please ensure the image contains a clear, front-facing face.")
-        raise ValueError(f"Face embedding extraction failed: {error_msg}")
+#         return embedding_vector
+#     except ValueError:
+#         raise
+#     except Exception as e:
+#         error_msg = str(e)
+#         # Provide more helpful error messages
+#         if "Face could not be detected" in error_msg or "enforce_detection" in error_msg:
+#             raise ValueError("No face detected in image. Please ensure the image contains a clear, front-facing face.")
+#         raise ValueError(f"Face embedding extraction failed: {error_msg}")
 
 
-def detect_faces(image: np.ndarray) -> List[dict]:
+# def detect_faces(image: np.ndarray) -> List[dict]:
+#     """
+#     Detect faces using Retinaface via DeepFace
+#     """
+
+#     try:
+#         detections = DeepFace.extract_faces(
+#             img_path=image,
+#             detector_backend='retinaface',
+#             enforce_detection=False,
+#             align=True,
+#         )
+
+#         detected_faces = []
+
+#         for det in detections:
+#             face = det["face"]
+#             region = det["facial_area"]
+
+#             h, w, _ = face.shape
+
+#             if h < MIN_FACE_SIZE or w < MIN_FACE_SIZE:
+#                 continue
+
+#             detected_faces.append({
+#                 "bbox": [
+#                     int(region["x"]),
+#                     int(region["y"]),
+#                     int(region["w"]),
+#                     int(region["h"])
+#                 ],
+#                 "region": face
+#             })
+
+#         return detected_faces
+
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=400,
+#             detail=f"RetinaFace detection failed: {str(e)}"
+#         )
+
+def detect_faces_yolo(image: np.ndarray) -> List[dict]:
     """
-    Detect all faces in an image and return their bounding boxes
+    Detect faces using YOLOv8-face
+    Returns list of {bbox, region}
+    """
+    results = yolo_face(image, conf=0.3, iou=0.5)[0]
+
+    faces = []
+
+    for box in results.boxes:
+        x1, y1, x2, y2 = map(int, box.xyxy[0])
+
+        w, h = x2 - x1, y2 - y1
+        if w < MIN_FACE_SIZE or h < MIN_FACE_SIZE:
+            continue
+
+        face_crop = image[y1:y2, x1:x2]
+
+        faces.append({
+            "bbox": [x1, y1, w, h],
+            "region": face_crop
+        })
+
+    return faces
+
+
+def calculate_iou(bbox1: List[int], bbox2: List[int]) -> float:
+    """
+    Calculate Intersection over Union (IoU) between two bounding boxes
+    bbox format: [x, y, width, height]
+    """
+    x1_1, y1_1, w1, h1 = bbox1
+    x1_2, y1_2, w2, h2 = bbox2
+    x2_1, y2_1 = x1_1 + w1, y1_1 + h1
+    x2_2, y2_2 = x1_2 + w2, y1_2 + h2
     
-    Args:
-        image: numpy array representing the image
-        
-    Returns:
-        List of dictionaries with face information (bbox, region)
+    # Calculate intersection
+    x1_i = max(x1_1, x1_2)
+    y1_i = max(y1_1, y1_2)
+    x2_i = min(x2_1, x2_2)
+    y2_i = min(y2_1, y2_2)
+    
+    if x2_i <= x1_i or y2_i <= y1_i:
+        return 0.0
+    
+    intersection = (x2_i - x1_i) * (y2_i - y1_i)
+    area1 = w1 * h1
+    area2 = w2 * h2
+    union = area1 + area2 - intersection
+    
+    if union == 0:
+        return 0.0
+    
+    return intersection / union
+
+
+def extract_arcface_embedding(face_img: np.ndarray) -> np.ndarray:
     """
-    try:
-        # Use OpenCV's face detector for efficient face detection
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        
-        # Convert to grayscale if needed
-        if len(image.shape) == 3:
-            gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    Extract ArcFace embedding using InsightFace FaceAnalysis
+    For cropped faces, add padding and ensure proper size
+    """
+    # Ensure face image is valid
+    if face_img is None or face_img.size == 0:
+        raise ValueError("Face image is empty or invalid")
+    
+    # Get dimensions
+    h, w = face_img.shape[:2]
+    
+    # Ensure minimum size
+    min_size = 64
+    if h < min_size or w < min_size:
+        scale = max(min_size / h, min_size / w) * 1.5
+        new_h, new_w = int(h * scale), int(w * scale)
+        face_img = cv2.resize(face_img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+        h, w = new_h, new_w
+    
+    # Add substantial padding (50% on each side) to help InsightFace detect the face
+    padding_ratio = 0.5
+    pad_h = int(h * padding_ratio)
+    pad_w = int(w * padding_ratio)
+    face_img_padded = cv2.copyMakeBorder(
+        face_img, 
+        pad_h, pad_h, pad_w, pad_w, 
+        cv2.BORDER_REPLICATE
+    )
+    
+    # InsightFace expects BGR
+    if len(face_img_padded.shape) == 3:
+        if face_img_padded.shape[2] == 3:
+            face_img_bgr = cv2.cvtColor(face_img_padded, cv2.COLOR_RGB2BGR)
         else:
-            gray = image
+            face_img_bgr = face_img_padded
+    else:
+        face_img_bgr = cv2.cvtColor(face_img_padded, cv2.COLOR_GRAY2BGR)
+
+    # Use InsightFace's get() method - it should detect the face in the padded image
+    faces = arcface_app.get(face_img_bgr)
+
+    if not faces or len(faces) == 0:
+        # Try with even more padding
+        pad_h2 = int(h * 0.8)
+        pad_w2 = int(w * 0.8)
+        face_img_padded2 = cv2.copyMakeBorder(
+            face_img, 
+            pad_h2, pad_h2, pad_w2, pad_w2, 
+            cv2.BORDER_REPLICATE
+        )
+        if len(face_img_padded2.shape) == 3 and face_img_padded2.shape[2] == 3:
+            face_img_bgr2 = cv2.cvtColor(face_img_padded2, cv2.COLOR_RGB2BGR)
+        else:
+            face_img_bgr2 = cv2.cvtColor(face_img_padded2, cv2.COLOR_GRAY2BGR)
         
-        # Detect faces
-        bboxes = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(MIN_FACE_SIZE, MIN_FACE_SIZE))
+        faces = arcface_app.get(face_img_bgr2)
         
-        detected_faces = []
-        for (x, y, w, h) in bboxes:
-            # Filter out faces that are too small
-            if w >= MIN_FACE_SIZE and h >= MIN_FACE_SIZE:
-                # Extract face region
-                face_region = image[y:y+h, x:x+w]
-                detected_faces.append({
-                    'bbox': [int(x), int(y), int(w), int(h)],
-                    'region': face_region
-                })
-        
-        return detected_faces
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Face detection error: {str(e)}")
+        if not faces or len(faces) == 0:
+            raise ValueError(f"FaceAnalysis could not extract embedding. Face size: {h}x{w}")
+
+    # Return the embedding from the first (and should be only) detected face
+    return faces[0].embedding
+
+
 
 
 def cosine_similarity(embedding1: np.ndarray, embedding2: np.ndarray) -> float:
@@ -263,7 +404,7 @@ async def register_face(request: FaceRegistrationRequest):
                     raise ValueError(f"Image {i+1} decoded to empty array")
                 
                 # Extract embedding from this image
-                embedding = extract_embedding(image)
+                embedding = extract_arcface_embedding(image)
                 embeddings.append(embedding)
                 
             except HTTPException:
@@ -314,7 +455,7 @@ async def recognize_group_photo(file: UploadFile = File(...)):
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     
     # Detect all faces in the image
-    detected_faces = detect_faces(image_rgb)
+    detected_faces = detect_faces_yolo(image_rgb)
     
     if len(detected_faces) == 0:
         return RecognitionResponse(
@@ -327,7 +468,7 @@ async def recognize_group_photo(file: UploadFile = File(...)):
     face_embeddings = []
     for face_info in detected_faces:
         try:
-            embedding = extract_embedding(face_info['region'])
+            embedding = extract_arcface_embedding(face_info['region'])
             face_embeddings.append({
                 'embedding': embedding,
                 'bbox': face_info['bbox']
@@ -431,10 +572,12 @@ async def match_faces(request: MatchFacesRequest):
 async def extract_face_embeddings(file: UploadFile = File(...)):
     """
     Extract embeddings from all faces in a group photo
-    This is a helper endpoint for the backend to get embeddings for matching
+    Uses YOLO for detection and InsightFace on full image for embeddings, then matches them
     """
     try:
         contents = await file.read()
+
+        print("Uploaded file size:", len(contents)) 
         
         if not contents or len(contents) == 0:
             raise HTTPException(status_code=400, detail="Empty file uploaded")
@@ -446,10 +589,11 @@ async def extract_face_embeddings(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="Invalid image file. Could not decode image.")
         
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image_bgr = image  # Keep BGR for InsightFace
         
-        # Detect faces
+        # Detect faces with YOLO
         try:
-            detected_faces = detect_faces(image_rgb)
+            detected_faces = detect_faces_yolo(image_rgb)
         except Exception as e:
             raise HTTPException(
                 status_code=400,
@@ -459,30 +603,74 @@ async def extract_face_embeddings(file: UploadFile = File(...)):
         if len(detected_faces) == 0:
             return {
                 "faces": [],
-                "total_faces": 0
+                "total_faces": 0,
+                "embedded_faces": 0
             }
         
-        # Extract embeddings for each face
+        # Get all face embeddings from InsightFace on the full image
+        insightface_faces = arcface_app.get(image_bgr)
+        
+        # Match YOLO detections with InsightFace detections using IoU
         face_data = []
-        for idx, face_info in enumerate(detected_faces):
-            try:
-                embedding = extract_embedding(face_info['region'])
+        matched_insightface_indices = set()
+        
+        for yolo_face in detected_faces:
+            yolo_bbox = yolo_face['bbox']  # [x, y, w, h]
+            best_match_idx = None
+            best_iou = 0.0
+            
+            # Find the InsightFace detection that best matches this YOLO detection
+            for idx, if_face in enumerate(insightface_faces):
+                if idx in matched_insightface_indices:
+                    continue
+                
+                # Convert InsightFace bbox to [x, y, w, h] format
+                if_bbox = if_face.bbox  # InsightFace bbox is [x1, y1, x2, y2]
+                if_bbox_formatted = [
+                    int(if_bbox[0]),
+                    int(if_bbox[1]),
+                    int(if_bbox[2] - if_bbox[0]),
+                    int(if_bbox[3] - if_bbox[1])
+                ]
+                
+                iou = calculate_iou(yolo_bbox, if_bbox_formatted)
+                if iou > best_iou and iou > 0.3:  # Minimum IoU threshold
+                    best_iou = iou
+                    best_match_idx = idx
+            
+            # If we found a match, use InsightFace embedding
+            if best_match_idx is not None:
+                matched_insightface_indices.add(best_match_idx)
+                embedding = insightface_faces[best_match_idx].embedding
                 face_data.append({
                     'embedding': embedding.tolist(),
-                    'bbox': face_info['bbox']
+                    'bbox': yolo_bbox
                 })
-            except ValueError as e:
-                # Skip faces that can't be processed (no face detected, etc.)
-                continue
-            except Exception as e:
-                # Log but continue with other faces
-                print(f"Warning: Failed to extract embedding for face {idx+1}: {str(e)}")
-                continue
+            else:
+                # Fallback: try to extract embedding from cropped face
+                try:
+                    embedding = extract_arcface_embedding(yolo_face['region'])
+                    face_data.append({
+                        'embedding': embedding.tolist(),
+                        'bbox': yolo_bbox
+                    })
+                except Exception as e:
+                    # Skip this face if embedding extraction fails
+                    print(f"Warning: Failed to extract embedding for face at {yolo_bbox}: {str(e)}")
+                    continue
+
+        print(
+            f"Detected faces: {len(detected_faces)}, "
+            f"InsightFace faces: {len(insightface_faces)}, "
+            f"Embeddings created: {len(face_data)}"
+        )
         
         return {
             "faces": face_data,
-            "total_faces": len(face_data)
+            "total_faces": len(detected_faces),   # YOLO detections
+            "embedded_faces": len(face_data)       # Successfully embedded faces
         }
+
     except HTTPException:
         raise
     except Exception as e:

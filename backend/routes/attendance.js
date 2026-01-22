@@ -65,6 +65,8 @@ router.post('/mark', authenticate, upload.single('photo'), async (req, res) => {
       });
     }
 
+    console.log(faceData)
+
     if (!faceData || faceData.total_faces === 0) {
       return res.status(400).json({ error: 'No faces detected in the photo' });
     }
@@ -123,7 +125,7 @@ router.post('/mark', authenticate, upload.single('photo'), async (req, res) => {
         total_students: students.length,
         present: matchedStudentIds.size,
         absent: students.length - matchedStudentIds.size,
-        faces_detected: matchResult.total_faces_detected,
+        faces_detected: faceData.total_faces || matchResult.total_faces_detected || 0,
         faces_matched: matchResult.matched_faces
       },
       attendance: attendanceRecords

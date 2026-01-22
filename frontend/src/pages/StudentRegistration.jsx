@@ -1,6 +1,11 @@
 import React, { useState } from 'react'
 import axios from 'axios'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Button } from '../components/ui/button'
+import { UserPlus, Upload, X, CheckCircle2, AlertCircle } from 'lucide-react'
 
 const StudentRegistration = () => {
   const [formData, setFormData] = useState({
@@ -42,6 +47,8 @@ const StudentRegistration = () => {
   const removePhoto = (index) => {
     const newPhotos = photos.filter((_, i) => index !== i)
     const newPreviews = previews.filter((_, i) => index !== i)
+    // Revoke object URLs to prevent memory leaks
+    URL.revokeObjectURL(previews[index])
     setPhotos(newPhotos)
     setPreviews(newPreviews)
   }
@@ -83,6 +90,7 @@ const StudentRegistration = () => {
       // Reset form
       setFormData({ name: '', roll_number: '', class_id: '' })
       setPhotos([])
+      previews.forEach(url => URL.revokeObjectURL(url))
       setPreviews([])
       document.getElementById('photo-input').value = ''
     } catch (error) {
@@ -96,162 +104,169 @@ const StudentRegistration = () => {
   }
 
   return (
-    <div className="px-4 py-8">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-3xl mx-auto bg-white rounded-xl shadow-lg p-8"
-      >
-        <h2 className="text-3xl font-bold text-gray-900 mb-6">
-          Student Face Registration
-        </h2>
-        <p className="text-gray-600 mb-6">
-          Register a student by uploading 3-5 clear face photos. Make sure faces
-          are clearly visible and well-lit.
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent mb-2">
+          Student Registration
+        </h1>
+        <p className="text-muted-foreground">
+          Register a new student by uploading 3-5 clear face photos
         </p>
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Student Name
-              </label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                required
-                value={formData.name}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="Enter student name"
-              />
+      <Card className="border-2">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <UserPlus className="h-5 w-5 text-primary" />
+            Register New Student
+          </CardTitle>
+          <CardDescription>
+            Make sure faces are clearly visible and well-lit in all photos
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Student Name</Label>
+                <Input
+                  type="text"
+                  id="name"
+                  name="name"
+                  required
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  placeholder="Enter student name"
+                  className="h-11"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="roll_number">Roll Number</Label>
+                <Input
+                  type="text"
+                  id="roll_number"
+                  name="roll_number"
+                  required
+                  value={formData.roll_number}
+                  onChange={handleInputChange}
+                  placeholder="Enter roll number"
+                  className="h-11"
+                />
+              </div>
+
+              <div className="md:col-span-2 space-y-2">
+                <Label htmlFor="class_id">Class ID</Label>
+                <Input
+                  type="number"
+                  id="class_id"
+                  name="class_id"
+                  required
+                  value={formData.class_id}
+                  onChange={handleInputChange}
+                  placeholder="Enter class ID"
+                  className="h-11"
+                />
+              </div>
             </div>
 
-            <div>
-              <label
-                htmlFor="roll_number"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Roll Number
-              </label>
-              <input
-                type="text"
-                id="roll_number"
-                name="roll_number"
-                required
-                value={formData.roll_number}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="Enter roll number"
+            <div className="space-y-2">
+              <Label htmlFor="photo-input" className="flex items-center gap-2">
+                <Upload className="h-4 w-4" />
+                Face Photos (3-5 photos required)
+              </Label>
+              <Input
+                id="photo-input"
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handlePhotoChange}
+                className="h-11 cursor-pointer"
               />
+              <p className="text-sm text-muted-foreground">
+                Selected: {photos.length} photos
+              </p>
             </div>
 
-            <div className="md:col-span-2">
-              <label
-                htmlFor="class_id"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Class ID
-              </label>
-              <input
-                type="number"
-                id="class_id"
-                name="class_id"
-                required
-                value={formData.class_id}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="Enter class ID"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="photo-input"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Face Photos (3-5 photos required)
-            </label>
-            <input
-              id="photo-input"
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handlePhotoChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-            <p className="mt-2 text-sm text-gray-500">
-              Selected: {photos.length} photos
-            </p>
-          </div>
-
-          <AnimatePresence>
-            {previews.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="grid grid-cols-2 md:grid-cols-3 gap-4"
-              >
-                {previews.map((preview, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ scale: 0.8 }}
-                    animate={{ scale: 1 }}
-                    className="relative group"
-                  >
-                    <img
-                      src={preview}
-                      alt={`Preview ${index + 1}`}
-                      className="w-full h-48 object-cover rounded-lg border-2 border-gray-200"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(index)}
-                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            <AnimatePresence>
+              {previews.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="grid grid-cols-2 md:grid-cols-3 gap-4"
+                >
+                  {previews.map((preview, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="relative group"
                     >
-                      ×
-                    </button>
-                  </motion.div>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                      <div className="aspect-square rounded-lg border-2 border-border overflow-hidden bg-muted">
+                        <img
+                          src={preview}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(index)}
+                        className="absolute top-2 right-2 bg-destructive text-destructive-foreground rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          <AnimatePresence>
-            {message.text && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className={`p-4 rounded-md ${
-                  message.type === 'success'
-                    ? 'bg-green-50 text-green-800 border border-green-200'
-                    : 'bg-red-50 text-red-800 border border-red-200'
-                }`}
-              >
-                {message.text}
-              </motion.div>
-            )}
-          </AnimatePresence>
+            <AnimatePresence>
+              {message.text && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className={`flex items-center gap-2 p-4 rounded-md ${
+                    message.type === 'success'
+                      ? 'bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400'
+                      : 'bg-destructive/10 border border-destructive/20 text-destructive'
+                  }`}
+                >
+                  {message.type === 'success' ? (
+                    <CheckCircle2 className="h-5 w-5" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5" />
+                  )}
+                  <span className="text-sm font-medium">{message.text}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          <button
-            type="submit"
-            disabled={loading || photos.length < 3}
-            className="w-full bg-indigo-600 text-white py-3 px-6 rounded-md font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? 'Registering...' : 'Register Student'}
-          </button>
-        </form>
-      </motion.div>
+            <Button
+              type="submit"
+              disabled={loading || photos.length < 3}
+              className="w-full h-11 text-base font-semibold"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                  Registering...
+                </span>
+              ) : (
+                <>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Register Student
+                </>
+              )}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }
 
 export default StudentRegistration
-
