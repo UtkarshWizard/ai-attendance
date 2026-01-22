@@ -60,7 +60,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 # Configuration
-SIMILARITY_THRESHOLD = 0.70  # Minimum cosine similarity for face match
+SIMILARITY_THRESHOLD = 0.60  # Lowered threshold for better selfie-to-group matching
 MIN_FACE_SIZE = 20  # Minimum face size in pixels to consider
 
 
@@ -274,10 +274,17 @@ def calculate_iou(bbox1: List[int], bbox2: List[int]) -> float:
     return intersection / union
 
 
-def extract_arcface_embedding(face_img: np.ndarray) -> np.ndarray:
+def extract_arcface_embedding(face_img: np.ndarray, is_full_image: bool = False) -> np.ndarray:
     """
     Extract ArcFace embedding using InsightFace FaceAnalysis
-    For cropped faces, add padding and ensure proper size
+    Handles both full selfie images and cropped faces from group photos
+    
+    Args:
+        face_img: Input image (RGB format)
+        is_full_image: True if this is a full selfie/portrait, False if already cropped
+    
+    Returns:
+        512-dimensional embedding vector
     """
     # Ensure face image is valid
     if face_img is None or face_img.size == 0:
@@ -286,64 +293,101 @@ def extract_arcface_embedding(face_img: np.ndarray) -> np.ndarray:
     # Get dimensions
     h, w = face_img.shape[:2]
     
-    # Ensure minimum size
-    min_size = 64
+    # Convert to BGR for InsightFace
+    if len(face_img.shape) == 3 and face_img.shape[2] == 3:
+        face_img_bgr = cv2.cvtColor(face_img, cv2.COLOR_RGB2BGR)
+    elif len(face_img.shape) == 2:
+        face_img_bgr = cv2.cvtColor(face_img, cv2.COLOR_GRAY2BGR)
+    else:
+        face_img_bgr = face_img
+    
+    # For full images (selfies), run InsightFace directly
+    if is_full_image:
+        faces = arcface_app.get(face_img_bgr)
+        if not faces or len(faces) == 0:
+            raise ValueError("No face detected in the selfie image")
+        # Return the largest face (most prominent)
+        largest_face = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
+        return largest_face.embedding
+    
+    # For cropped faces from group photos, we need more sophisticated handling
+    # Strategy: Create a properly sized canvas with the face centered
+    
+    # Ensure minimum size with quality upscaling
+    min_size = 112  # InsightFace works best with faces >= 112x112
     if h < min_size or w < min_size:
-        scale = max(min_size / h, min_size / w) * 1.5
+        scale = max(min_size / h, min_size / w) * 1.2
         new_h, new_w = int(h * scale), int(w * scale)
-        face_img = cv2.resize(face_img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+        face_img_bgr = cv2.resize(face_img_bgr, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
         h, w = new_h, new_w
     
-    # Add substantial padding (50% on each side) to help InsightFace detect the face
-    padding_ratio = 0.5
-    pad_h = int(h * padding_ratio)
-    pad_w = int(w * padding_ratio)
-    face_img_padded = cv2.copyMakeBorder(
-        face_img, 
-        pad_h, pad_h, pad_w, pad_w, 
-        cv2.BORDER_REPLICATE
-    )
+    # Apply histogram equalization for better feature extraction
+    # Convert to LAB color space for better lighting normalization
+    lab = cv2.cvtColor(face_img_bgr, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    l = clahe.apply(l)
+    enhanced_bgr = cv2.cvtColor(cv2.merge([l, a, b]), cv2.COLOR_LAB2BGR)
     
-    # InsightFace expects BGR
-    if len(face_img_padded.shape) == 3:
-        if face_img_padded.shape[2] == 3:
-            face_img_bgr = cv2.cvtColor(face_img_padded, cv2.COLOR_RGB2BGR)
-        else:
-            face_img_bgr = face_img_padded
-    else:
-        face_img_bgr = cv2.cvtColor(face_img_padded, cv2.COLOR_GRAY2BGR)
-
-    # Use InsightFace's get() method - it should detect the face in the padded image
-    faces = arcface_app.get(face_img_bgr)
-
-    if not faces or len(faces) == 0:
-        # Try with even more padding
-        pad_h2 = int(h * 0.8)
-        pad_w2 = int(w * 0.8)
-        face_img_padded2 = cv2.copyMakeBorder(
-            face_img, 
-            pad_h2, pad_h2, pad_w2, pad_w2, 
+    # Create a larger canvas with generous padding
+    # This helps InsightFace's detector work better on cropped faces
+    canvas_size = max(h, w) * 3  # 3x the face size
+    canvas = np.zeros((canvas_size, canvas_size, 3), dtype=np.uint8)
+    
+    # Fill with average color to reduce edge artifacts
+    avg_color = enhanced_bgr.mean(axis=(0, 1)).astype(np.uint8)
+    canvas[:] = avg_color
+    
+    # Center the face on the canvas
+    y_offset = (canvas_size - h) // 2
+    x_offset = (canvas_size - w) // 2
+    canvas[y_offset:y_offset+h, x_offset:x_offset+w] = enhanced_bgr
+    
+    # Apply slight Gaussian blur to edges for smoother transition
+    mask = np.zeros((canvas_size, canvas_size), dtype=np.uint8)
+    mask[y_offset:y_offset+h, x_offset:x_offset+w] = 255
+    mask = cv2.GaussianBlur(mask, (21, 21), 11)
+    mask = mask[:, :, np.newaxis] / 255.0
+    
+    # Try to extract embedding from the canvas
+    faces = arcface_app.get(canvas)
+    
+    if faces and len(faces) > 0:
+        # Return the most centered face
+        center_x, center_y = canvas_size // 2, canvas_size // 2
+        best_face = min(faces, key=lambda f: 
+            abs((f.bbox[0] + f.bbox[2]) / 2 - center_x) + 
+            abs((f.bbox[1] + f.bbox[3]) / 2 - center_y)
+        )
+        return best_face.embedding
+    
+    # Fallback: Try with different padding strategies
+    for pad_ratio in [0.8, 1.0, 1.5]:
+        pad_h = int(h * pad_ratio)
+        pad_w = int(w * pad_ratio)
+        
+        padded = cv2.copyMakeBorder(
+            enhanced_bgr,
+            pad_h, pad_h, pad_w, pad_w,
             cv2.BORDER_REPLICATE
         )
-        if len(face_img_padded2.shape) == 3 and face_img_padded2.shape[2] == 3:
-            face_img_bgr2 = cv2.cvtColor(face_img_padded2, cv2.COLOR_RGB2BGR)
-        else:
-            face_img_bgr2 = cv2.cvtColor(face_img_padded2, cv2.COLOR_GRAY2BGR)
         
-        faces = arcface_app.get(face_img_bgr2)
-        
-        if not faces or len(faces) == 0:
-            raise ValueError(f"FaceAnalysis could not extract embedding. Face size: {h}x{w}")
-
-    # Return the embedding from the first (and should be only) detected face
-    return faces[0].embedding
+        faces = arcface_app.get(padded)
+        if faces and len(faces) > 0:
+            return faces[0].embedding
+    
+    # Last resort: Return error with diagnostic info
+    raise ValueError(
+        f"Could not extract embedding from cropped face. "
+        f"Face size: {h}x{w}. Try using higher quality images."
+    )
 
 
 
 
 def cosine_similarity(embedding1: np.ndarray, embedding2: np.ndarray) -> float:
     """
-    Calculate cosine similarity between two embeddings
+    Calculate cosine similarity between two embeddings with L2 normalization
     
     Args:
         embedding1: first embedding vector
@@ -352,16 +396,18 @@ def cosine_similarity(embedding1: np.ndarray, embedding2: np.ndarray) -> float:
     Returns:
         cosine similarity score (0 to 1)
     """
-    # Normalize vectors
-    norm1 = np.linalg.norm(embedding1)
-    norm2 = np.linalg.norm(embedding2)
+    # L2 normalize embeddings (standard practice for ArcFace)
+    embedding1 = embedding1 / (np.linalg.norm(embedding1) + 1e-8)
+    embedding2 = embedding2 / (np.linalg.norm(embedding2) + 1e-8)
     
-    if norm1 == 0 or norm2 == 0:
-        return 0.0
+    # Calculate cosine similarity (dot product of normalized vectors)
+    similarity = np.dot(embedding1, embedding2)
     
-    # Calculate cosine similarity
-    similarity = np.dot(embedding1, embedding2) / (norm1 * norm2)
-    return float(similarity)
+    # Clip to valid range and convert to float
+    similarity = np.clip(similarity, -1.0, 1.0)
+    
+    # Convert from [-1, 1] to [0, 1] range
+    return float((similarity + 1.0) / 2.0)
 
 
 @app.post("/register-face", response_model=FaceRegistrationResponse)
@@ -404,7 +450,8 @@ async def register_face(request: FaceRegistrationRequest):
                     raise ValueError(f"Image {i+1} decoded to empty array")
                 
                 # Extract embedding from this image
-                embedding = extract_arcface_embedding(image)
+                # Mark as full image since these are selfies/portraits during registration
+                embedding = extract_arcface_embedding(image, is_full_image=True)
                 embeddings.append(embedding)
                 
             except HTTPException:
